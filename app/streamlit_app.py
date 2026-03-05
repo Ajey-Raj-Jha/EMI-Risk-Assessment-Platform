@@ -1,11 +1,11 @@
-# app/streamlit_app.py
 import streamlit as st
 import pandas as pd
 import joblib
 import os
 
 st.set_page_config(page_title="EMI Risk Assessment", layout="centered")
-st.title(" EMI Risk Assessment Platform")
+
+st.title("EMI Risk Assessment Platform")
 
 MODEL_DIR = "models"
 
@@ -24,8 +24,37 @@ train_cols_class = safe_load(f"{MODEL_DIR}/train_columns_class.pkl")
 train_cols_reg = safe_load(f"{MODEL_DIR}/train_columns_reg.pkl")
 
 
-# User Inputs
+# --------------------------------------------------
+# MODEL PERFORMANCE METRICS
+# --------------------------------------------------
 
+st.header("Model Performance")
+
+st.subheader("Regression Model (Max EMI Prediction)")
+
+col1, col2, col3, col4 = st.columns(4)
+
+col1.metric("RMSE", "3861.29")
+col2.metric("MAE", "2771.22")
+col3.metric("R² Score", "0.747")
+col4.metric("MAPE", "166.41%")
+
+st.subheader("Classification Model (EMI Eligibility)")
+
+col5, col6, col7, col8, col9 = st.columns(5)
+
+col5.metric("Accuracy", "96.85%")
+col6.metric("Precision", "98.21%")
+col7.metric("Recall", "95.43%")
+col8.metric("F1 Score", "96.80%")
+col9.metric("ROC-AUC", "0.996")
+
+st.divider()
+
+
+# --------------------------------------------------
+# USER INPUT
+# --------------------------------------------------
 
 st.header("Enter Customer Details")
 
@@ -65,6 +94,9 @@ with st.form("form"):
     submit = st.form_submit_button("Predict")
 
 
+# --------------------------------------------------
+# RAW INPUT DATA
+# --------------------------------------------------
 
 raw_input = {
     "age": age,
@@ -90,53 +122,35 @@ raw_input = {
 input_df = pd.DataFrame([raw_input])
 
 
-#One-Hot Encoding
+# --------------------------------------------------
+# ONE HOT ENCODING
+# --------------------------------------------------
 
-
-def add_onehot(df, col_name, prefix, value, possible_values):
+def add_onehot(df, prefix, value, possible_values):
     for val in possible_values:
         df[f"{prefix}_{val}"] = 1 if value == val else 0
 
-# Gender columns expected:
-gender_vals = ["FEMALE", "Female", "female", "MALE", "Male", "male", "M"]
-selected_gender = gender
 
-
-add_onehot(input_df, "gender", "gender", selected_gender, gender_vals)
-
-
-add_onehot(input_df, "marital_status", "marital_status", marital_status, ["Single"])
-
-add_onehot(input_df, "education", "education", education, [
-    "High School", "Post Graduate", "Professional"
-])
-
-add_onehot(input_df, "employment_type", "employment_type", employment_type, [
-    "Private", "Self-employed"
-])
-
-
-add_onehot(input_df, "company_type", "company_type", company_type, [
-    "MNC", "Mid-size", "Small", "Startup"
-])
-
-
-add_onehot(input_df, "house_type", "house_type", house_type, ["Own", "Rented"])
-
-
-add_onehot(input_df, "emi_scenario", "emi_scenario", emi_scenario, [
+add_onehot(input_df, "gender", gender, ["Male", "Female"])
+add_onehot(input_df, "marital_status", marital_status, ["Single"])
+add_onehot(input_df, "education", education, ["High School", "Post Graduate", "Professional"])
+add_onehot(input_df, "employment_type", employment_type, ["Private", "Self-employed"])
+add_onehot(input_df, "company_type", company_type, ["MNC", "Mid-size", "Small", "Startup"])
+add_onehot(input_df, "house_type", house_type, ["Own", "Rented"])
+add_onehot(input_df, "emi_scenario", emi_scenario, [
     "Education EMI",
     "Home Appliances EMI",
     "Personal Loan EMI",
     "Vehicle EMI"
 ])
 
-
 input_df["emi_eligibility_High_Risk"] = 0
 input_df["emi_eligibility_Not_Eligible"] = 0
 
-# Align with training columns
 
+# --------------------------------------------------
+# COLUMN ALIGNMENT
+# --------------------------------------------------
 
 def align(df, cols):
     for c in cols:
@@ -144,16 +158,21 @@ def align(df, cols):
             df[c] = 0
     return df.reindex(cols, axis=1)
 
+
+# --------------------------------------------------
+# PREDICTION
+# --------------------------------------------------
+
 if submit:
 
-    # REGRESSION
     aligned_reg = align(input_df.copy(), train_cols_reg)
     pred_reg = reg.predict(aligned_reg)[0]
+
     st.success(f"Estimated EMI Affordable Amount: ₹{pred_reg:,.2f}")
 
-    # CLASSIFICATION
     aligned_class = align(input_df.copy(), train_cols_class)
     pred_raw = clf.predict(aligned_class)[0]
 
     human_label = "Eligible" if pred_raw == 0 else "High Risk"
+
     st.success(f"EMI Eligibility: {human_label}")
